@@ -8,6 +8,8 @@
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_ONLY_MP3
 #define MINIMP3_NO_STDIO
+#define GPIO_BUTTON_1 GPIO_NUM_34  // He he emote
+#define GPIO_BUTTON_2 GPIO_NUM_35  // Menu music
 #include "minimp3.h"
 
 extern "C"
@@ -15,10 +17,18 @@ extern "C"
   void app_main();
 }
 
-void wait_for_button_push()
+int wait_for_button_push()
 {
-  while (gpio_get_level(GPIO_BUTTON) == 1)
+  while (true)
   {
+    if (gpio_get_level(GPIO_BUTTON_1) == 0)
+    {
+      return 1;
+    }
+    if (gpio_get_level(GPIO_BUTTON_2) == 0)
+    {
+      return 2;
+    }
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -44,8 +54,10 @@ void play_task(void *param)
   gpio_set_level(I2S_SPEAKDER_SD_PIN, 1);
 #endif
   // setup the button to trigger playback - see config.h for settings
-  gpio_set_direction(GPIO_BUTTON, GPIO_MODE_INPUT);
-  gpio_set_pull_mode(GPIO_BUTTON, GPIO_PULLUP_ONLY);
+  gpio_set_direction(GPIO_BUTTON_1, GPIO_MODE_INPUT);
+  gpio_set_pull_mode(GPIO_BUTTON_1, GPIO_PULLUP_ONLY);
+  gpio_set_direction(GPIO_BUTTON_2, GPIO_MODE_INPUT);
+  gpio_set_pull_mode(GPIO_BUTTON_2, GPIO_PULLUP_ONLY);
   // create the file system
   SPIFFS spiffs("/fs");
   // setup for the mp3 decoded
@@ -62,7 +74,7 @@ void play_task(void *param)
   while (true)
   {
     // wait for the button to be pushed
-    wait_for_button_push();
+    int button_pressed = wait_for_button_push();
     // mp3 decoder state
     mp3dec_t mp3d = {};
     mp3dec_init(&mp3d);
@@ -73,7 +85,8 @@ void play_task(void *param)
     int decoded = 0;
     bool is_output_started = false;
     // this assumes that you have uploaded the mp3 file to the SPIFFS
-    FILE *fp = fopen("/fs/test.mp3", "r");
+    const char* filename = (button_pressed == 1) ? "/fs/test1.mp3" : "/fs/menua.mp3";
+    FILE *fp = fopen(filename, "r");
     if (!fp)
     {
       ESP_LOGE("main", "Failed to open file");
